@@ -27,7 +27,7 @@
   "license": "AGPL-3.0",
   "dependencies": {
     "@algorandfoundation/liquid-client": "1.0.0-canary.3",
-    "@algorandfoundation/provider": "github:algorandfoundation/wallet-provider-ts",
+    "@algorandfoundation/provider": "github:michaeltchuang/algorand-devrel-wallet-provider-ts#json_support",
     "cbor-x": "^1.6.0"
   },
   "devDependencies": {
