@@ -1,5 +1,5 @@
 import {LinkMessage, SignalClient} from '@algorandfoundation/liquid-client/signal';
-import { decode } from 'cbor-x';
+import * as cbor from 'cbor';
 import { fromBase64Url, toBase64URL, toSignTransactionsParamsRequestMessage } from '@algorandfoundation/provider';
 import { Transaction, encodeUnsignedTransaction } from 'algosdk';
 import { LiquidOptions } from './interfaces.js';
@@ -96,53 +96,24 @@ export class LiquidAuthClient {
 
     const awaitResponse = (): Promise<(Uint8Array | null)[]> => new Promise((resolve, reject) => {
       if (this.dataChannel) {
-        this.dataChannel.onmessage = async (evt: { data: string | ArrayBuffer | Blob }) => {
-          let message: any;
+        this.dataChannel.onmessage = (evt: { data: string }) => {
+          try {
+            const message = cbor.decodeFirstSync(fromBase64Url(evt.data));
 
-          // Handle different data types from DataChannel
-          if (typeof evt.data === 'string') {
-            // Check if it's JSON or base64url encoded CBOR
-            try {
-              // Try parsing as JSON first
-              message = JSON.parse(evt.data);
-            } catch (jsonError) {
-              // If JSON parsing fails, assume it's base64url encoded CBOR
-              try {
-                const decodedData = fromBase64Url(evt.data);
-                message = decode(decodedData);
-              } catch (cborError) {
-                reject(new Error(`Failed to decode message: ${cborError}`));
-                return;
-              }
-            }
-          } else if (evt.data instanceof ArrayBuffer) {
-            // Data is already binary ArrayBuffer - decode as CBOR
-            const decodedData = new Uint8Array(evt.data);
-            message = decode(decodedData);
-          } else if (evt.data instanceof Blob) {
-            // Data is Blob, need to convert to ArrayBuffer first
-            const arrayBuffer = await evt.data.arrayBuffer();
-            const decodedData = new Uint8Array(arrayBuffer);
-            message = decode(decodedData);
-          } else {
-            reject(new Error('Unsupported data type received from DataChannel'));
-            return;
-          }
-
-          if (message.reference === 'arc0027:sign_transactions:response') {
+            if (message.reference === 'arc0027:sign_transactions:response') {
             if (message.requestId !== messageId) {
               reject(new Error('Request ID mismatch'));
               return;
             }
             const encodedStxns = message.result.stxns;
-
-            // The stxns field contains base64url-encoded signed transaction bytes
-            // We decode them directly as Uint8Array, not as signatures to attach
             const signedTransactions = encodedStxns.map((stxn: string) => {
               return fromBase64Url(stxn);
             });
 
             resolve(signedTransactions);
+            }
+          } catch (error) {
+            reject(new Error(`Failed to decode CBOR message: ${error}`));
           }
         };
       }
@@ -154,6 +125,7 @@ export class LiquidAuthClient {
       txnGroup.map((txn) => ({ txn: toBase64URL(encodeUnsignedTransaction(txn as Transaction)) }))
     );
 
+    console.log("Sending message:", encodedStr);
     this.dataChannel.send(encodedStr);
     return await awaitResponse();
   }
