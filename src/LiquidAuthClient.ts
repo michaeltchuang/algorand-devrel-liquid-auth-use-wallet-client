@@ -235,20 +235,19 @@ export class LiquidAuthClient {
       throw new TypeError(INVALID_DATACHANNEL_CALLBACK);
     }
     const qrLinkElement = this.modalElement!.querySelector('#qr-link') as HTMLAnchorElement;
-    let address: string | null = null;
     if (qrLinkElement) {
       qrLinkElement.href = 'https://github.com/algorandfoundation/liquid-auth-js';
       this.client.peer(this.requestId!, 'offer', this.RTC_CONFIGURATION).then((dc: RTCDataChannel)=>{
         this.handleDataChannel(dc)
-        onDataChannel(address!);
       });
 
       this.client.on('link-message', (message: LinkMessage ) => {
-        address = message.wallet;
+        const address = message.wallet;
         const offerElement = this.modalElement!.querySelector('.offer') as HTMLElement;
         if (offerElement) {
           offerElement.classList.add('hidden');
         }
+        onDataChannel(address);
       });
 
       const image = this.modalElement!.querySelector('#liquid-qr-code') as HTMLImageElement;
